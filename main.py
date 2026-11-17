@@ -1,140 +1,2 @@
-import sys
-V=[0,100,320,330,500,900,0]
-ND=[-33,-31,-18,-14,14,18,31,33]
-BD=[-17,-15,15,17];RD=[-16,-1,1,16]
-CC=[(1,4,6,(5,6)),(2,4,2,(1,2,3)),(4,116,118,(117,118)),(8,116,114,(113,114,115))]
-F="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-Q=[i for i in range(128)if not i&0x88]
-B=[0]*128;H=[];S=C=N=0;E=-1
-K=lambda m:10*V[abs(B[(m>>7)&127])]-V[abs(B[m&127])]
-def AT(s,a):
- for D,T in(((-15*a,-17*a),1),(ND,2),(BD+RD,6)):
-  for d in D:
-   if not(s+d)&0x88 and B[s+d]==a*T:return 1
- for D,T in((BD,3),(RD,4)):
-  for d in D:
-   j=s+d
-   while not j&0x88 and not B[j]:j+=d
-   if not j&0x88 and B[j]in(a*T,a*5):return 1
- return 0
-def GN():
- M=[];d=16*S;A=lambda j:i|j<<7|(5<<14 if(j>>4)%7==0 else 0)
- for i in Q:
-  t=B[i]*S
-  if t<=0:continue
-  if t==1:
-   j=i+d
-   if not B[j]:
-    M.append(A(j))
-    if(i>>4)==6-5*(S>0)and not B[i+2*d]:M.append(i|(i+2*d)<<7)
-   for x in(d-1,d+1):
-    j=i+x
-    if not j&0x88 and(B[j]*S<0 or j==E):M.append(A(j))
-  elif t in(2,6):
-   for x in ND if t==2 else BD+RD:
-    j=i+x
-    if not j&0x88 and B[j]*S<=0:M.append(i|j<<7)
-   if t==6:
-    for bt,k,t2,em in CC:
-     if C&bt and k==i and all(not B[x]for x in em)and not any(AT(x,-S)for x in(k,(k+t2)//2,t2)):M.append(k|t2<<7)
-  else:
-   for x in BD if t==3 else RD if t==4 else BD+RD:
-    j=i+x
-    while not j&0x88:
-     if B[j]*S>0:break
-     M.append(i|j<<7)
-     if B[j]:break
-     j+=x
- return M
-def MK(m):
- global S,C,E,N;N+=1
- if N>60000:N=N/0
- f=m&127;t=(m>>7)&127;pr=m>>14;p=B[f];c=B[t]
- H.append((m,c,C,E))
- if p*S==1 and t==E and not c:B[t-16*S]=0
- B[t]=pr*S if pr else p;B[f]=0
- if p*S==6 and abs(t-f)==2:
-  rf,rt=(f+3,f+1)if t>f else(f-4,f-1);B[rt]=B[rf];B[rf]=0
- for s,n in((4,12),(116,3),(0,13),(7,14),(112,7),(119,11)):
-  if f==s or t==s:C&=n
- E=f+16*S if p*S==1 and abs(t-f)==32 else-1;S=-S
-def UM():
- global S,C,E
- m,c,C,E=H.pop();S=-S;f=m&127;t=(m>>7)&127;p=B[t]
- if m>>14:p=S
- B[f]=p;B[t]=c
- if p*S==1 and t==E and not c:B[t]=0;B[t-16*S]=-S
- if p*S==6 and abs(t-f)==2:
-  rf,rt=(f+3,f+1)if t>f else(f-4,f-1);B[rf]=B[rt];B[rt]=0
-def LG():
- R=[]
- for m in GN():
-  MK(m)
-  if not AT(B.index(-S*6),S):R.append(m)
-  UM()
- return R
-def EV():
- s=0
- for i in Q:
-  p=B[i]
-  if p:
-   t=abs(p);r=i>>4;u=r if p>0 else 7-r;cn=7-abs(3.5-(i&7))-abs(3.5-r)
-   s+=(V[t]+[0,u*6,cn*8,cn*5,0,cn,-cn*3][t])*(1 if p>0 else-1)
- return s*S
-def QS(a,b):
- if S*6 not in B:return-100000
- e=EV()
- if e>=b:return b
- a=max(a,e)
- for m in GN():
-  if B[(m>>7)&127]or m>>14:
-   MK(m);s=-QS(-b,-a);UM()
-   if s>=b:return b
-   if s>a:a=s
- return a
-def NG(d,a,b):
- if S*6 not in B:return-100000+d
- if d==0:return QS(a,b)
- M=GN()
- if not M:return-100000-d if AT(B.index(S*6),-S)else 0
- M.sort(key=K,reverse=1)
- for m in M:
-  MK(m);s=-NG(d-1,-b,-a);UM()
-  if s>=b:return b
-  if s>a:a=s
- return a
-def SF(fen):
- global B,S,C,E,N;B=[0]*128;w=fen.split();r=7;f=0
- for ch in w[0]:
-  if ch=='/':r-=1;f=0
-  elif ch.isdigit():f+=int(ch)
-  else:B[r*16+f]=(1 if ch.isupper()else-1)*("pnbrqk".index(ch.lower())+1);f+=1
- S=1 if len(w)<2 or w[1]=='w'else-1;C=0;E=-1;N=0
- if len(w)>2:C=sum(k for ch,k in zip("KQkq",(1,2,4,8))if ch in w[2])
- if len(w)>3 and w[3]!='-':E=(int(w[3][1])-1)*16+ord(w[3][0])-97
-def MS(m):
- f=m&127;t=(m>>7)&127;return chr(97+(f&7))+str((f>>4)+1)+chr(97+(t&7))+str((t>>4)+1)+("q"if m>>14 else"")
-def GO(g):
- global N;N=0;M=LG();best=M[0]
- try:
-  for d in range(1,99):
-   a=-10**9;bm=best
-   for m in sorted(M,key=K,reverse=1):
-    MK(m);s=-NG(d-1,-10**9,-a);UM()
-    if s>a:a=s;bm=m
-   best=bm
- except:pass
- print("bestmove "+MS(best),flush=1)
-SF(F)
-for L in sys.stdin:
- w=L.split()
- if w[0]=='uci':print("id name T\nuciok",flush=1)
- elif w[0]=='isready':print("readyok",flush=1)
- elif w[0]=='position':
-  if w[1]=='startpos':SF(F)
-  else:j=w.index('moves')if'moves'in w else len(w);SF(' '.join(w[2:j]))
-  if'moves'in w:
-   for x in w[w.index('moves')+1:]:
-    f=(int(x[1])-1)*16+ord(x[0])-97;t=(int(x[3])-1)*16+ord(x[2])-97
-    MK(f|t<<7|(("nbrq".index(x[4])+2 if len(x)>4 else 0)<<14))
- elif w[0]=='go':GO(w)
+#coding:l1
+import lzma;exec(lzma.decompress('\0 \0\0ñ\0\0\0\0\0\0\0+Âw|°x4,@Èƒ·Ô¯ÎB2XşØìCYòD&oF6_ê1Éøl¿æª˜v´æİ&¨­8¨®ß©O\rOšù‹§±u9"µš†øm§›x\n‚¬2˜Œ¦®ÙÌU÷ÊM[<2“ tn]Æd?˜Üá»fÏÊ¼–r¼MÏ,Ÿ~÷äz¯Ÿhx—ò–š­û_äËßÔ¸ê³şgXAÉŸûuŒØŠÈÒãuèp¸q+„Í¡…ßôc\0*±’´ïm[ß¡ âÛ-ÆÖğœJÂoé2TYÎŞ”JyŞ*‹‚ÙJÄâeñ³0ş÷oÈ‹ß·ù\\2…à +à¯³™’dk“†bJ„/ñ*kñeKç+e“2ò‘™…K$nˆUy"<óşi{EK—íSè•Ñ@Ş4ÿöê•_@h´–‡€vÆ!P–1º~È-vÅÅÂì/È‰WøWß0Â~ETÑÎ· —¶s|êBu–Xˆz13åß$(‰!Ü*€lTfÅŠt6dAÿ…•3Íœ¹;½Í7#Ô\nTœËë¤Ómƒ!óÊé‹=–ç21Şß>™2ÿ‹Ü¿\0Ès«#®x>İĞôAú<.ª»&]ÉMåV= WˆÌB4,NÚˆ>\rİXì-Ä6¤\0açºL.¹"ß=¡­åıÖ™b07¹ïÿhgÃO;À€ø«ŸbÆ¦ò«Â)9é_ÉÂ¯#ù<D”\n¨U·y§tšŸàúÈêşÛ—ñ5”J=ÎÈ‡W;L¡ÿ’®+úëÕ °œüd\rœ;*¦q+?š3ÛŞ‘J’ÈîÛùª)qÏRá!ú‡½»ÆXıÃ˜•pMŸ®"á³íÏËfäuH¥Ç{áTV§äÀ¢EÍdDs|C|]àírJîrÛÑşg!Oñd¢E*MÎ@ÈT¨ñDó733Hc`Ü/CñŒ"‡tŠ†:);âW\'>"CîÇü™â2*İ#¡şöûÒûš|!Ì»Qõƒ\r÷÷×/õy27Ã|óHXË‘g«º\'fagXM˜3c:)4àêœCÙ²œOÏf“¡±Á£ÔWHmœ+ôÃñrà{7`‰ÚÃ\\„a<(\nZC$\0æÒ©÷±Ôgá¡Di!5[i n¬º£o\n	]¯S‘ìöÜ´*p\0ÚÂ¼ç›dÅü´MhwLiˆœŸ	ŞÛ¨irªo¦Q†\\_,`p³2UÆâ!ìyéZa÷nÔiÏFµ*ù÷\'¥ø÷;é†pJÃ³=yt·„øÔôÿG\r3şÂÂ\'¢T$\'f\\`×Qí®]ø%êr=W5„°ƒUƒg|È0·÷vO@rItŠÅ“0äw‹}f*ˆ“Ñ~#·ª€Dpã†aÌuN™(ßş?Õ»¥-Nªr ïªÄ‚´J‰ŞmUµæ†ñ%O‡Yy{ŠsP²bšææP×Ø‰÷òrø¤e;[í·¬‡B\\êøßÕï»¸#¢w”yckRüLîı°Xz”‡ß-æü¦‘~ö7DCq¶ÆLûÚ\r«1O9¯LhééùŞúÊC,‰ÓÛ0±İŠ@ùc!ƒKu89cÉDD~˜¼($U<nG	xN£sl÷æÏ­¶Ú´W´³³AïÌÚ¿\0 <Ö4ó®è´Ê~ nE\r‚*|¸fDgâ8¡#&²½\\)¹æ%À×m4&m~ÄRD¤—dºfµB*¥ûıJæĞbávê0#z ±ÕÕ’nQ lÅù¢ÖgÖº¨‡«ø_†=sË%Ï‹/kîºuÕ_»Qóô™ÍĞA2`ëXZÁbD%{4ªÑó••U¤èüÀ•øÛ³øæwOïm«`ìüR$à3ÔŠ3ĞìÖXŒÕ\naÇµ®_áâ%]rzG?mT};]©ò7^×‡Sl\r–),TMáÃ\nûêóyÉ?yTAÍÖ†‹¯Uš ¸Æ{|oòÃÍÖPë™a"Ò\r‘Ô¡‘@+erÃ…çÉşÔÂ $àÓv5,KPtÒap“Ü~|›LÌÏ§KèmG†ñ¸à35¤±Œ8M‹…HÄóÎ¨j‚\0t3:A?½\reæ=CJX^üGÔâ)ÜîÆå\\ÃÂ\n­uOªÌyg½TÿL·ºâã2’"?pÓìÅ;·A4Šßz¸nuQÃh1³N>Î.$Eİü&XíÎG¸qvA	—ëöÏÊÜ…/ó×ÛèbØ+rª:İé²(W/ÔS6o@rÑ:NˆÒ;£gú¿¶ÑyÖƒÒ ÃëæiÔ/o	a\\È.İÚ<— ×7™QehÀöäğ¡™u¢Î·¾\nÔs¬`õ1zëµøRYU~kŠş"Fğ—ŞV´ZHÔG{FŠÃŸ—¤:óåÍ¹cŒôqs,¯\x000pv‡ofçş—MtCßµ2æÉ?e«ª$|ıLF\'5×Hérn¸—Ÿèª§ˆ+)†ˆŒ2+õß~¢£Ï²Só\'B­E X	`o¨%cB—5ĞMrú\'=TëŞ¾à<‚æõûcÍr†‰Æÿ@¸Ÿ{üÁwí×Ê©zòñZİÇ/D\\¦wv€Ã¥J»®:]Şäük+OÄ¨nSvÏ½eNƒá˜ÿ7D”G¢«ÿf–3ÚŠêe0aR³êıªv£Ùj°Âƒ…êß²= f‡¸)­YÊì4>›TùÜè“äÆ·pc5Ôz6Šv‰Ñ¯JK¤¢CŞÙËAF6?ÖPù^Dd©áHŒ½WY†Ë/Ë›2‚æJ^G¬Æ1-;¥¸¼À;hfTg¸5òa€)°¼ïQ¾kC»C³,f‡‡aö¡‹+}‹q­1}èÃ[½’š^û4šãƒR°à°h¡yAş«(½[T`]ä×9R7|!OÜõ&‘–Ÿ	 ¶íØğÒçÿE‘Èv6ÄtËáÄòd	®W9ğÇLwRÜï8ud¤VÇwë:7¥ˆrÖ?p÷²Sô5r¾Ş¦ûÚ’-Hz4~>V ¤YçR•<‚Æ!õT+ÍÅŠmß:îÚÇ\\;è¼”šv©e¤DÓ`Ù³ªğŞò	û¦ÁõŠéÎUp}K½áñÏÖâM¤W`‹‚ìR ?Bµ\\câÓ…ËêS¹ xÉßKÃøåaá­\r°>ñdŠ9PVÍ~#kQ|ÖŞ:!Æ¨Ø•ÌPähŸ\'†sÏ¯”a&ÎGŠ…`¼L¹°`ÕqvC‘WK›ŠØ‹4?bÀ^÷2Ğj^Ÿ[0»Ì_îª¦@±ğéû·_\'|‡ÔRvÒ²%zÓ÷‚slõOË£à†ŒÂFpªıZ@]úQm\0Û¡Óİc›I/‚˜<IS##s,å,HÌw0p==k­’@üM®œL]aX&ärpWØJ5‡õxQ‚&À|>(WfØÿB¾_Waj¹Ş®òU)%bš×¼±\\WP{FŞ”\\œáRşÆ™UO…ş¦W;†C:Iæ÷iJdï{µÃ•¿$ªíÇÍğo¶“õ)¨EÊ“Vçpé	F4[¦5õ“Xqµf³ôµAëØsw2Î?ˆá‰›'.encode('l1')))
