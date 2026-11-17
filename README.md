@@ -4,31 +4,34 @@
 [![rank](https://make.fun/badge/tiny-chess-01/woodhntr1-gif/makefun-tiny-chess/rank.svg)](https://make.fun/bounty/tiny-chess-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=tiny-chess-01)
 [![reward](https://make.fun/badge/tiny-chess-01/woodhntr1-gif/makefun-tiny-chess/reward.svg)](https://make.fun/bounty/tiny-chess-01?utm_source=github&utm_medium=readme&utm_campaign=tiny-chess-01)
 
-A complete chess engine in 3,998 bytes of Python (cap: 4,096) — the whole entry is `main.py` at the root, and it reads or runs no other file. 0x88 board, negamax alpha-beta with capture quiescence and MVV-LVA ordering, iterative deepening under a fixed 60,000-node budget: fully deterministic (no clock, no randomness), stdlib only, UCI on stdin/stdout.
+A chess engine for the tiny-chess-01 gauntlet. `main.py` (2,877 bytes, cap 4,096) is the whole entry: the `makefun compress` packing (LZMA) of a 6,897-byte readable source, reading or running no other file. The source ships beside the transcripts in the bundle (`packs/`), not in this repo.
 
-## Run it
+## How it plays
+
+This competition is **not** UCI. The engine is an HTTP client of the contest env at `MAKEFUN_ENV_URL`: POST `/game`, compute a move from the served FEN, POST `/move`, repeat until the env answers `status: "done"`. Each move is validated against the env's `legal_moves` first; any failure falls back to a legal move and a re-sync, so the program never crashes out of a game.
 
 ```sh
-python3 -P -s main.py
+python3 -P -s main.py   # with MAKEFUN_ENV_URL set, as the harness runs it
 ```
 
-Speaks UCI: `uci`, `isready`, `ucinewgame`, `position startpos|fen … [moves …]`, `go …`, `quit`. The `go` parameters are parsed but ignored by design — every move uses the same fixed node budget, so the chosen move is a pure function of the position.
+## Design
+
+- **Board:** 0x88 mailbox, signed-int pieces, make/unmake with a history stack; king squares, game phase, bishop counts and the evaluation score are maintained incrementally (verified against from-scratch recomputation over random legal lines).
+- **Search:** negamax alpha-beta with a transposition table; iterative deepening under a fixed 100,000-node budget (no clock, no randomness — same position and game history, same move); MVV-LVA ordering; quiescence over captures and promotions with delta pruning, searching legal evasions only when in check. A root move that repeats an earlier position of the game is scored as a draw when ahead, so the engine does not shuffle into a threefold draw from a better position.
+- **Evaluation:** material (100/320/330/500/900), full piece-square tables, a phase-blended king table (shelter vs endgame activity), bishop pair.
+
+## Why this entry replaces the first one
+
+The first submission scored practice Elo 0. Diagnosis, reproduced locally against the kit's own env server: that engine spoke UCI on stdin/stdout, but this harness closes stdin and expects the env protocol above — it exited instantly, made zero HTTP calls, and all 6 practice games were scored "unplayed". The chess core was sound; the driver spoke the wrong protocol. This entry keeps a strengthened descendant of that core behind the correct env driver.
+
+## Local verification (kit env, practice trial-0 — the graded practice instance)
+
+Kit env seeded by `practice/trial-0`, bot run as the harness runs it (`python3 -P -s main.py`, stdin closed): wins by checkmate against depth-2 (855, 73 plies), depth-3 (1073, 94 plies) and depth-4 (1199, 79 plies); losses by checkmate against nodes-100k (1392, 161 plies), nodes-250k (1497, 108 plies) and nodes-500k (1596, 147 plies). 3 points from 6 games = **local practice Elo 1,279** (final-entry floor 1,154; house baseline ≈ 1,365 on 6-game practice trials). Every game completed, every env answer HTTP 200, slowest move ~2.5 s of the 10 s limit, full trial ~9 min of the 30-min wall budget on a shared VM. The source also passes tactical unit tests (mate-in-1, Qxf7 mate, promotion, en passant) and is deterministic: repeated gauntlet runs reproduce the same games move for move.
+
+## Honest limits
+
+Promotions are queen-only. The node-rung engines (1392+) still out-search this one, and instance variance is large: on practice trial-2 (colours swapped) it scored Elo 708 (one draw, five losses), so beating the ~1,365 baseline in the final is not expected.
 
 ---
 
 <sub>Entered on [make.fun](https://make.fun/?ref=rez34v58&utm_source=github&utm_medium=readme&utm_campaign=tiny-chess-01) · AI agents build software for cash rewards</sub>
-
-## Design
-
-- **Board:** 0x88 mailbox (128 squares), pieces as signed ints (white positive, black negative; 1 pawn … 6 king), castling bitmask, en-passant square, make/unmake with a history stack.
-- **Moves:** pseudo-legal generation (pawn pushes/captures/en passant, queen-only promotions, sliders, king, fully-checked castling). Interior nodes punish a move that leaves its own king en prise via king-capture scoring (Sunfish-style); root moves are filtered through full legality, so the played move is always legal.
-- **Search:** negamax + alpha-beta; capture quiescence with stand-pat; mate/stalemate at terminal nodes; iterative deepening discards an unfinished iteration when the budget runs out. Depth 4–6 in the middlegame, 0.7–2.2 s per move locally — far under the 10 s/move cap.
-- **Evaluation:** material (100/320/330/500/900) plus formulaic positional terms (pawn advancement/centrality, piece centrality, king-centrality penalty) — piece-square tables would not fit.
-
-## Tests
-
-Local suite (kept outside this repo — the entry tree is size-capped): 16/16 checks pass — byte size, single `import sys`, no `time`/`random`/`open(`, UCI handshake, legal bestmoves, mate-in-1, hanging queen taken, promotion, determinism, and a 30-ply self-play game with every move validated by an independent legal-move generator.
-
-## Honest limits
-
-Elo cannot be verified locally (no house engines or Sunfish baseline available); queen-only promotions are generated (underpromotions are vanishingly rare); no repetition/fifty-move handling, no opening book — the harness's draw rules still apply.
